@@ -1,0 +1,13 @@
+# Zugriff auf Datenbank & sensible Dateien blockieren
+<FilesMatch "\.(sqlite|sqlite3|db)$">
+    Require all denied
+</FilesMatch>
+
+# Nach der Einrichtung (siehe README, Schritt "install.php entfernen"):
+# Kommentar in der Zeile darunter entfernen, um install.php zusätzlich
+# per Webserver zu sperren (empfohlen zusätzlich zum Löschen der Datei).
+<Files "install.php">
+    # Require all denied
+</Files>
+
+Options -Indexes
