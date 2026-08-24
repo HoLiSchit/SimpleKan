@@ -83,6 +83,7 @@ function ensure_schema(): void
             description TEXT NOT NULL DEFAULT "",
             due_date TEXT,
             priority TEXT,
+            tag TEXT,
             archived INTEGER NOT NULL DEFAULT 0,
             position INTEGER NOT NULL DEFAULT 0,
             created_at TEXT NOT NULL DEFAULT (datetime("now")),
@@ -102,6 +103,9 @@ function ensure_schema(): void
     }
     if (!table_has_column($pdo, 'cards', 'archived')) {
         $pdo->exec('ALTER TABLE cards ADD COLUMN archived INTEGER NOT NULL DEFAULT 0');
+    }
+    if (!table_has_column($pdo, 'cards', 'tag')) {
+        $pdo->exec('ALTER TABLE cards ADD COLUMN tag TEXT');
     }
 
     $colCount = (int)$pdo->query('SELECT COUNT(*) FROM board_columns')->fetchColumn();

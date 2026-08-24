@@ -1,6 +1,7 @@
 # SimpleKan
 
-Ein schlankes, selbst-gehostetes Kanban-Board ohne Build-Prozess:
+Ein schlankes, selbst-gehostetes Kanban-Board für **einen Account und
+ein Board** — kein Multi-Tenancy, keine Teams, kein Build-Prozess.
 PHP + SQLite im Backend, Tailwind (CDN) im Frontend. Ordner auf den
 Server laden, einrichten, loslegen.
 
@@ -9,15 +10,25 @@ Server laden, einrichten, loslegen.
 - Login mit einem Admin-Account (Passwort-Hashing, Session-Schutz)
 - Spalten frei verwaltbar: anlegen, umbenennen, Farbe ändern, löschen,
   per Drag & Drop sortieren
-- Karten mit Titel, Beschreibung, Fälligkeitsdatum und Priorität
+- Karten mit Titel, Beschreibung, **Ort/Projekt-Tag** (z. B.
+  "Swipe-Stack", "Homepage"), Fälligkeitsdatum und Priorität
   (Niedrig/Mittel/Hoch), inkl. farbiger Badges
+- **Filter nach Ort/Projekt** über ein Dropdown im Header, kombinierbar
+  mit der Live-Suche
 - Drag & Drop für Karten (zwischen Spalten) und für Spalten (Reihenfolge)
-- WIP-Limit pro Spalte (z. B. max. 5 Karten "In Arbeit"), Anzeige wird
-  rot, wenn überschritten
+- WIP-Limit pro Spalte, Anzeige wird rot, wenn überschritten
 - Live-Suche über alle Karten (Titel + Beschreibung)
 - Archiv statt sofortigem Löschen: Karten archivieren, später
   wiederherstellen oder endgültig entfernen
 - Dark Mode (Umschalter, merkt sich die Wahl, respektiert System-Einstellung)
+
+## Bekannte Einschränkung
+
+Drag & Drop nutzt die native HTML5-Drag&Drop-API. Diese funktioniert
+zuverlässig auf Desktop-Browsern, hat aber **keine native
+Touch-Unterstützung** — auf Smartphones/Tablets lassen sich Karten
+aktuell nicht per Wischen verschieben (Klicken/Bearbeiten funktioniert
+aber problemlos).
 
 ## Voraussetzungen
 
@@ -29,58 +40,53 @@ Server laden, einrichten, loslegen.
 ## Installation
 
 1. Kompletten Ordner (Inhalt dieses Repos) per FTP/SFTP/`scp` oder `git
-   clone` auf den Server laden, z. B. nach `/var/www/html/kanban` oder
-   in ein Unterverzeichnis deiner Domain.
+   clone` auf den Server laden, z. B. nach `/var/www/html/simplekan`
+   oder in ein Unterverzeichnis deiner Domain.
 
 2. **Dateiberechtigungen setzen.** Der Webserver-Nutzer (häufig
    `www-data`, je nach Setup auch `nginx`, `apache` oder dein eigener
    User) muss in `data/` schreiben dürfen, damit die SQLite-Datenbank
    angelegt werden kann:
    ```bash
-   cd kanban
+   cd simplekan
    chmod 755 .
    chmod 775 data
    chown -R www-data:www-data data      # Nutzer/Gruppe an dein Setup anpassen
    ```
-   Falls du unsicher bist, welcher Nutzer dein PHP ausführt, hilft
-   `ps aux | grep php-fpm` oder ein kurzer `<?php echo exec('whoami'); ?>`
-   in einer Testdatei (danach wieder löschen).
+   Unsicher, welcher Nutzer dein PHP ausführt? `ps aux | grep php-fpm`
+   oder kurz `<?php echo exec('whoami'); ?>` in einer Testdatei
+   aufrufen (danach wieder löschen).
 
-3. `install.php` im Browser aufrufen (`https://deine-domain.de/kanban/install.php`)
+3. `install.php` im Browser aufrufen (`https://deine-domain.de/simplekan/install.php`)
    und Benutzername + Passwort für den einzigen Account festlegen.
 
-4. **`install.php` löschen.** Das ist der wichtigste Sicherheitsschritt
-   nach der Einrichtung – sonst könnte theoretisch jemand die Datei
-   erneut aufrufen und versuchen, Unfug zu treiben (auch wenn ein
-   zweiter Account-Versuch serverseitig blockiert wird, gehört die
-   Datei danach schlicht nicht mehr auf einen Produktivserver):
+4. **`install.php` löschen.** Wichtigster Sicherheitsschritt nach der
+   Einrichtung:
    ```bash
    rm install.php
    ```
 
-5. **`.htaccess` schärfen (optional, empfohlen).** Öffne die
-   `.htaccess` im Projektordner und entferne die Raute vor
-   `Require all denied` im `<Files "install.php">`-Block:
+5. **`.htaccess` schärfen (optional, empfohlen).** In der `.htaccess`
+   im Projektordner die Raute vor `Require all denied` im
+   `<Files "install.php">`-Block entfernen:
    ```apache
    <Files "install.php">
        Require all denied
    </Files>
    ```
-   Das blockt den Zugriff auf `install.php` zusätzlich auf
-   Webserver-Ebene, falls die Datei aus Versehen doch mal wieder
-   hochgeladen wird (z. B. bei einem künftigen Deployment aus Git).
-   Gilt nur für Apache mit aktiviertem `mod_rewrite`/`AllowOverride All`
-   – bei Nginx siehe Hinweis unten.
+   Blockt den Zugriff auf `install.php` zusätzlich auf
+   Webserver-Ebene, falls die Datei z. B. bei einem künftigen
+   Git-Deployment aus Versehen wieder mit hochgeladen wird. Gilt nur
+   für Apache mit `AllowOverride All` – bei Nginx siehe Hinweis unten.
 
 6. Unter `index.php` einloggen und loslegen.
 
 ### Update einer bestehenden Installation
 
-Einfach alle Dateien überschreiben *außer* `data/kanban.sqlite` (die
-enthält deine Karten). Das Datenbankschema migriert sich beim nächsten
-Laden automatisch – neue Spalten/Felder werden ergänzt, ohne dass
-Daten verloren gehen. `install.php` brauchst du dafür nicht erneut
-auszuführen (blockt sich bei bestehendem Account ohnehin selbst ab).
+Alle Dateien überschreiben *außer* `data/kanban.sqlite` (enthält deine
+Karten). Das Datenbankschema migriert sich beim nächsten Laden
+automatisch – neue Spalten/Felder werden ergänzt, ohne Datenverlust.
+`install.php` musst du dafür nicht erneut ausführen.
 
 ## Sicherheits-Features
 
@@ -106,19 +112,19 @@ simplekan/
 ├── index.php             # Das Board
 ├── config.php              # DB-Verbindung, Schema-Migration, Session, CSRF
 ├── api/
-│   ├── cards.php              # Karten: list/create/update/delete/archive/restore/reorder
+│   ├── cards.php              # Karten: list/tags/create/update/delete/archive/restore/reorder
 │   └── columns.php             # Spalten: list/create/rename/recolor/set_limit/delete/reorder
 ├── assets/js/board.js            # Frontend-Logik (Vanilla JS, kein Framework)
 ├── data/kanban.sqlite               # SQLite-Datenbank (entsteht automatisch)
 ├── .htaccess                          # Zugriffsschutz für Apache
-└── .gitignore                          # Schließt die Datenbank vom Repo aus
+├── .gitignore                          # Schließt die Datenbank vom Repo aus
+└── LICENSE                              # MIT
 ```
 
 ## Hinweis zu Nginx
 
-Nutzt dein Server Nginx statt Apache, greift `.htaccess` nicht. Blocke
-den Zugriff auf `.sqlite`-Dateien und `install.php` stattdessen im
-Server-Block, z. B.:
+`.htaccess` greift nur bei Apache. Bei Nginx stattdessen im
+Server-Block:
 
 ```nginx
 location ~* \.(sqlite|sqlite3|db)$ {
@@ -128,3 +134,8 @@ location = /install.php {
     deny all;
 }
 ```
+
+## Lizenz
+
+MIT – siehe `LICENSE`. Quelloffen, Attribution (Copyright-Hinweis in
+Kopien) erforderlich.

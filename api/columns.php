@@ -145,7 +145,6 @@ switch ("$method:$action") {
                     $moveStmt->execute([':c' => $moveTo, ':p' => $maxPos, ':id' => $row['id']]);
                 }
             }
-            // Archivierte Karten der gelöschten Spalte bleiben im Archiv erhalten, Spaltenbezug wird auf die Zielspalte (falls vorhanden) oder erste Spalte umgehängt
             $fallback = $moveTo ?: (string)$pdo->query('SELECT col_key FROM board_columns WHERE col_key != ' . $pdo->quote($key) . ' ORDER BY position ASC LIMIT 1')->fetchColumn();
             $pdo->prepare('UPDATE cards SET column_key = :c WHERE column_key = :k AND archived = 1')->execute([':c' => $fallback, ':k' => $key]);
 

@@ -3,10 +3,9 @@
     Require all denied
 </FilesMatch>
 
-# Nach der Einrichtung (siehe README, Schritt "install.php entfernen"):
-# Kommentar in der Zeile darunter entfernen, um install.php zusätzlich
-# per Webserver zu sperren (empfohlen zusätzlich zum Löschen der Datei).
 <Files "install.php">
+    # Nach der Einrichtung: Kommentar entfernen, um install.php zusätzlich
+    # per Webserver zu sperren (siehe README).
     # Require all denied
 </Files>
 

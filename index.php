@@ -36,9 +36,13 @@ $jsVersion = @filemtime(__DIR__ . '/assets/js/board.js') ?: time();
 
 <header class="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 px-6 py-3 flex flex-wrap items-center justify-between gap-3 shrink-0">
     <h1 class="text-lg font-bold text-slate-800 dark:text-slate-100">SimpleKan</h1>
-    <div class="flex items-center gap-2 flex-1 min-w-[180px] max-w-sm">
+    <div class="flex items-center gap-2 flex-1 min-w-[180px] max-w-md">
         <input id="search-input" type="search" placeholder="Karten durchsuchen…"
             class="w-full text-sm rounded-lg border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-100 px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-slate-400">
+        <select id="tag-filter"
+            class="text-sm rounded-lg border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-100 px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-slate-400 shrink-0">
+            <option value="">Alle Orte</option>
+        </select>
     </div>
     <div class="flex items-center gap-3">
         <button id="archive-btn" type="button"
@@ -74,6 +78,12 @@ $jsVersion = @filemtime(__DIR__ . '/assets/js/board.js') ?: time();
                 <label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Beschreibung</label>
                 <textarea id="card-description" rows="3" maxlength="2000"
                     class="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-slate-400"></textarea>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Ort / Projekt</label>
+                <input id="card-tag" type="text" maxlength="40" list="tag-suggestions" placeholder="z. B. Swipe-Stack, Homepage…"
+                    class="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-slate-400">
+                <datalist id="tag-suggestions"></datalist>
             </div>
             <div class="grid grid-cols-2 gap-3">
                 <div>

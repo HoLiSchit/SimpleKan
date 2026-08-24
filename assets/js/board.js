@@ -7,6 +7,8 @@
 
     const boardEl = document.getElementById('board');
     const searchInput = document.getElementById('search-input');
+    const tagFilterSelect = document.getElementById('tag-filter');
+    const tagSuggestions = document.getElementById('tag-suggestions');
 
     const cardModal = document.getElementById('card-modal');
     const cardForm = document.getElementById('card-form');
@@ -15,6 +17,7 @@
     const inputColumn = document.getElementById('card-column');
     const inputTitle = document.getElementById('card-title');
     const inputDescription = document.getElementById('card-description');
+    const inputTag = document.getElementById('card-tag');
     const inputDueDate = document.getElementById('card-due-date');
     const inputPriority = document.getElementById('card-priority');
     const deleteCardBtn = document.getElementById('delete-card-btn');
@@ -47,8 +50,19 @@
     const BORDER_CLASS = { sky: 'border-l-sky-500', rose: 'border-l-rose-500', slate: 'border-l-slate-500', amber: 'border-l-amber-500', emerald: 'border-l-emerald-500', neutral: 'border-l-neutral-400', violet: 'border-l-violet-500', cyan: 'border-l-cyan-500', lime: 'border-l-lime-500', fuchsia: 'border-l-fuchsia-500', orange: 'border-l-orange-500', teal: 'border-l-teal-500', indigo: 'border-l-indigo-500', pink: 'border-l-pink-500' };
     const PRIORITY_LABELS = { niedrig: 'Niedrig', mittel: 'Mittel', hoch: 'Hoch' };
     const PRIORITY_CLASS = { niedrig: 'bg-slate-100 text-slate-600 dark:bg-slate-600 dark:text-slate-200', mittel: 'bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300', hoch: 'bg-rose-100 text-rose-700 dark:bg-rose-900/50 dark:text-rose-300' };
+    const TAG_CHIP_CLASSES = [
+        'bg-sky-100 text-sky-700 dark:bg-sky-900/50 dark:text-sky-300',
+        'bg-violet-100 text-violet-700 dark:bg-violet-900/50 dark:text-violet-300',
+        'bg-teal-100 text-teal-700 dark:bg-teal-900/50 dark:text-teal-300',
+        'bg-orange-100 text-orange-700 dark:bg-orange-900/50 dark:text-orange-300',
+        'bg-fuchsia-100 text-fuchsia-700 dark:bg-fuchsia-900/50 dark:text-fuchsia-300',
+        'bg-lime-100 text-lime-700 dark:bg-lime-900/50 dark:text-lime-300',
+        'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/50 dark:text-cyan-300',
+        'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300',
+    ];
 
     let columnsState = [];
+    let allTags = [];
     // 'card' | 'column' | null — verhindert, dass sich Karten- und Spalten-Drag gegenseitig stören
     let draggedType = null;
 
@@ -73,6 +87,19 @@
         return div.innerHTML;
     }
 
+    function hashString(str) {
+        let hash = 0;
+        for (let i = 0; i < str.length; i++) {
+            hash = (hash << 5) - hash + str.charCodeAt(i);
+            hash |= 0;
+        }
+        return Math.abs(hash);
+    }
+
+    function tagChipClass(tag) {
+        return TAG_CHIP_CLASSES[hashString(tag.toLowerCase()) % TAG_CHIP_CLASSES.length];
+    }
+
     async function apiCall(base, action, method, body, extraQuery) {
         method = method || 'GET';
         const opts = { method: method, headers: { 'Content-Type': 'application/json' } };
@@ -95,6 +122,19 @@
         select.innerHTML = COLORS.map((c) => `<option value="${c}" ${c === selected ? 'selected' : ''}>${COLOR_LABELS[c] || c}</option>`).join('');
     }
 
+    async function refreshTags() {
+        try {
+            const data = await apiCall(CARDS_API, 'tags');
+            allTags = (data && data.tags) || [];
+            tagSuggestions.innerHTML = allTags.map((t) => `<option value="${escapeHtml(t)}">`).join('');
+            const currentFilter = tagFilterSelect.value;
+            tagFilterSelect.innerHTML = '<option value="">Alle Orte</option>' +
+                allTags.map((t) => `<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`).join('');
+            if (allTags.includes(currentFilter)) tagFilterSelect.value = currentFilter;
+        } catch (err) { /* still fine without tags */ }
+    }
+    if (tagFilterSelect) tagFilterSelect.addEventListener('change', applySearchFilter);
+
     function formatDate(iso) {
         const [y, m, d] = iso.split('-');
         return `${d}.${m}.${y}`;
@@ -116,6 +156,11 @@
         return `<span class="inline-block text-xs px-1.5 py-0.5 rounded ${PRIORITY_CLASS[priority]}">${PRIORITY_LABELS[priority]}</span>`;
     }
 
+    function tagBadge(tag) {
+        if (!tag) return '';
+        return `<span class="inline-block text-xs px-1.5 py-0.5 rounded font-medium ${tagChipClass(tag)}">${escapeHtml(tag)}</span>`;
+    }
+
     // --- Card rendering ---
     function createCardEl(card, columnKey, color) {
         const el = document.createElement('div');
@@ -124,7 +169,8 @@
         el.dataset.id = card.id;
         el.dataset.title = card.title.toLowerCase();
         el.dataset.description = (card.description || '').toLowerCase();
-        const badges = dueDateBadge(card.due_date) + priorityBadge(card.priority);
+        el.dataset.tag = (card.tag || '').toLowerCase();
+        const badges = tagBadge(card.tag) + dueDateBadge(card.due_date) + priorityBadge(card.priority);
         el.innerHTML = `
             <div class="font-medium text-slate-800 dark:text-slate-100 break-words">${escapeHtml(card.title)}</div>
             ${card.description ? `<div class="text-slate-500 dark:text-slate-400 text-xs mt-1 break-words line-clamp-3">${escapeHtml(card.description)}</div>` : ''}
@@ -228,7 +274,6 @@
         boardEl.appendChild(addColBtn);
     }
 
-    // Nur der Spaltenkopf ist draggable -> kein Konflikt mehr mit Karten-Drag&Drop
     function attachColumnDnD(section, handle) {
         handle.addEventListener('dragstart', (e) => {
             draggedType = 'column';
@@ -279,10 +324,13 @@
 
     function applySearchFilter() {
         const term = (searchInput.value || '').trim().toLowerCase();
+        const tagFilter = (tagFilterSelect.value || '').toLowerCase();
         document.querySelectorAll('.card').forEach((card) => {
-            const match = !term || card.dataset.title.includes(term) || card.dataset.description.includes(term);
-            card.style.display = match ? '' : 'none';
+            const matchesText = !term || card.dataset.title.includes(term) || card.dataset.description.includes(term);
+            const matchesTag = !tagFilter || card.dataset.tag === tagFilter;
+            card.style.display = (matchesText && matchesTag) ? '' : 'none';
         });
+        updateCounts();
     }
     if (searchInput) searchInput.addEventListener('input', applySearchFilter);
 
@@ -290,6 +338,7 @@
         const [colsData, cardsData] = await Promise.all([
             apiCall(COLUMNS_API, 'list'),
             apiCall(CARDS_API, 'list'),
+            refreshTags(),
         ]);
         if (colsData) renderColumns(colsData.columns);
         if (cardsData) renderCards(cardsData.columns);
@@ -302,6 +351,7 @@
         inputColumn.value = columnKey;
         inputTitle.value = '';
         inputDescription.value = '';
+        inputTag.value = '';
         inputDueDate.value = '';
         inputPriority.value = '';
         deleteCardBtn.classList.add('hidden');
@@ -316,6 +366,7 @@
         inputColumn.value = columnKey;
         inputTitle.value = card.title;
         inputDescription.value = card.description || '';
+        inputTag.value = card.tag || '';
         inputDueDate.value = card.due_date || '';
         inputPriority.value = card.priority || '';
         deleteCardBtn.classList.remove('hidden');
@@ -334,6 +385,7 @@
             title: inputTitle.value.trim(),
             description: inputDescription.value.trim(),
             column: inputColumn.value,
+            tag: inputTag.value.trim() || null,
             due_date: inputDueDate.value || null,
             priority: inputPriority.value || null,
         };
@@ -469,7 +521,7 @@
             }
             archiveList.innerHTML = cards.map((c) => `
                 <div class="flex items-center justify-between gap-3 bg-slate-100 dark:bg-slate-700 rounded-lg px-3 py-2" data-archive-id="${c.id}">
-                    <span class="text-sm text-slate-700 dark:text-slate-200 truncate">${escapeHtml(c.title)}</span>
+                    <span class="text-sm text-slate-700 dark:text-slate-200 truncate">${escapeHtml(c.title)}${c.tag ? ` <span class="text-xs text-slate-400">(${escapeHtml(c.tag)})</span>` : ''}</span>
                     <div class="flex gap-2 shrink-0">
                         <button type="button" class="restore-btn text-xs text-emerald-600 dark:text-emerald-400 hover:underline">Wiederherstellen</button>
                         <button type="button" class="perma-delete-btn text-xs text-rose-600 dark:text-rose-400 hover:underline">Löschen</button>

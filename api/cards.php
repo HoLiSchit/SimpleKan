@@ -40,6 +40,15 @@ function normalize_priority(?string $p): ?string
     return in_array($p, PRIORITIES, true) ? $p : null;
 }
 
+function normalize_tag(?string $t): ?string
+{
+    if ($t === null) return null;
+    $t = trim($t);
+    if ($t === '') return null;
+    if (mb_strlen($t) > 40) $t = mb_substr($t, 0, 40);
+    return $t;
+}
+
 $method = $_SERVER['REQUEST_METHOD'];
 $action = $_GET['action'] ?? '';
 
@@ -56,7 +65,7 @@ switch ("$method:$action") {
 
     case 'GET:list':
         $archived = isset($_GET['archived']) && $_GET['archived'] === '1' ? 1 : 0;
-        $stmt = $pdo->prepare('SELECT id, column_key, title, description, due_date, priority, position FROM cards WHERE archived = :a ORDER BY column_key, position ASC');
+        $stmt = $pdo->prepare('SELECT id, column_key, title, description, due_date, priority, tag, position FROM cards WHERE archived = :a ORDER BY column_key, position ASC');
         $stmt->execute([':a' => $archived]);
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
         $grouped = [];
@@ -68,6 +77,7 @@ switch ("$method:$action") {
                 'description' => $row['description'],
                 'due_date' => $row['due_date'],
                 'priority' => $row['priority'],
+                'tag' => $row['tag'],
                 'position' => (int)$row['position'],
                 'column' => $row['column_key'],
             ];
@@ -77,6 +87,12 @@ switch ("$method:$action") {
         respond($archived ? ['cards' => $flat] : ['columns' => $grouped]);
         break;
 
+    case 'GET:tags':
+        $stmt = $pdo->query('SELECT DISTINCT tag FROM cards WHERE tag IS NOT NULL AND tag != "" AND archived = 0 ORDER BY tag COLLATE NOCASE ASC');
+        $tags = array_map(fn($r) => $r['tag'], $stmt->fetchAll(PDO::FETCH_ASSOC));
+        respond(['tags' => $tags]);
+        break;
+
     case 'POST:create':
         $body = json_body();
         $column = (string)($body['column'] ?? '');
@@ -84,6 +100,7 @@ switch ("$method:$action") {
         $description = trim((string)($body['description'] ?? ''));
         $dueDate = $body['due_date'] ?? null;
         $priority = normalize_priority($body['priority'] ?? null);
+        $tag = normalize_tag($body['tag'] ?? null);
 
         if (!valid_column($pdo, $column)) respond(['error' => 'Ungültige Spalte.'], 422);
         if ($title === '' || mb_strlen($title) > 200) respond(['error' => 'Titel ist erforderlich (max. 200 Zeichen).'], 422);
@@ -92,8 +109,8 @@ switch ("$method:$action") {
 
         $maxPos = (int)$pdo->query("SELECT COALESCE(MAX(position), -1) FROM cards WHERE column_key = " . $pdo->quote($column))->fetchColumn();
 
-        $stmt = $pdo->prepare('INSERT INTO cards (column_key, title, description, due_date, priority, position, updated_at) VALUES (:c, :t, :d, :due, :p, :pos, datetime("now"))');
-        $stmt->execute([':c' => $column, ':t' => $title, ':d' => $description, ':due' => $dueDate ?: null, ':p' => $priority, ':pos' => $maxPos + 1]);
+        $stmt = $pdo->prepare('INSERT INTO cards (column_key, title, description, due_date, priority, tag, position, updated_at) VALUES (:c, :t, :d, :due, :p, :tag, :pos, datetime("now"))');
+        $stmt->execute([':c' => $column, ':t' => $title, ':d' => $description, ':due' => $dueDate ?: null, ':p' => $priority, ':tag' => $tag, ':pos' => $maxPos + 1]);
 
         respond(['id' => (int)$pdo->lastInsertId()], 201);
         break;
@@ -105,14 +122,15 @@ switch ("$method:$action") {
         $description = trim((string)($body['description'] ?? ''));
         $dueDate = $body['due_date'] ?? null;
         $priority = normalize_priority($body['priority'] ?? null);
+        $tag = normalize_tag($body['tag'] ?? null);
 
         if ($id <= 0) respond(['error' => 'Ungültige ID.'], 422);
         if ($title === '' || mb_strlen($title) > 200) respond(['error' => 'Titel ist erforderlich (max. 200 Zeichen).'], 422);
         if (mb_strlen($description) > 2000) respond(['error' => 'Beschreibung zu lang.'], 422);
         if (!valid_due_date($dueDate)) respond(['error' => 'Ungültiges Datum.'], 422);
 
-        $stmt = $pdo->prepare('UPDATE cards SET title = :t, description = :d, due_date = :due, priority = :p, updated_at = datetime("now") WHERE id = :id');
-        $stmt->execute([':t' => $title, ':d' => $description, ':due' => $dueDate ?: null, ':p' => $priority, ':id' => $id]);
+        $stmt = $pdo->prepare('UPDATE cards SET title = :t, description = :d, due_date = :due, priority = :p, tag = :tag, updated_at = datetime("now") WHERE id = :id');
+        $stmt->execute([':t' => $title, ':d' => $description, ':due' => $dueDate ?: null, ':p' => $priority, ':tag' => $tag, ':id' => $id]);
 
         respond(['ok' => true]);
         break;
