@@ -65,6 +65,9 @@
     let allTags = [];
     // 'card' | 'column' | null — verhindert, dass sich Karten- und Spalten-Drag gegenseitig stören
     let draggedType = null;
+    // Snapshots zur Erkennung ungespeicherter Änderungen (Klick-außerhalb-Schutz)
+    let cardModalSnapshot = null;
+    let columnModalSnapshot = null;
 
     // --- Dark Mode Toggle ---
     function updateThemeLabel() {
@@ -98,6 +101,13 @@
 
     function tagChipClass(tag) {
         return TAG_CHIP_CLASSES[hashString(tag.toLowerCase()) % TAG_CHIP_CLASSES.length];
+    }
+
+    function setCardBorderColor(cardEl, columnKey) {
+        const col = columnsState.find((c) => c.key === columnKey);
+        const color = col ? col.color : 'slate';
+        Object.values(BORDER_CLASS).forEach((cls) => cardEl.classList.remove(cls));
+        cardEl.classList.add(BORDER_CLASS[color] || BORDER_CLASS.slate);
     }
 
     async function apiCall(base, action, method, body, extraQuery) {
@@ -202,6 +212,10 @@
             if (draggedType !== 'card') return;
             e.preventDefault();
             list.classList.remove('drag-over');
+            // Bugfix: Randfarbe der verschobenen Karte an die neue Spalte anpassen,
+            // sonst behält die Karte optisch die Farbe der Ursprungsspalte.
+            const dragging = document.querySelector('.card.dragging');
+            if (dragging) setCardBorderColor(dragging, list.dataset.column);
             updateCounts();
             await persistCardOrder();
         });
@@ -345,6 +359,22 @@
     }
 
     // --- Card modal ---
+    function snapshotCardForm() {
+        return {
+            title: inputTitle.value,
+            description: inputDescription.value,
+            tag: inputTag.value,
+            dueDate: inputDueDate.value,
+            priority: inputPriority.value,
+        };
+    }
+
+    function cardFormIsDirty() {
+        if (!cardModalSnapshot) return false;
+        const current = snapshotCardForm();
+        return Object.keys(current).some((k) => current[k] !== cardModalSnapshot[k]);
+    }
+
     function openCreateCardModal(columnKey) {
         cardModalTitle.textContent = 'Neue Karte';
         inputId.value = '';
@@ -357,6 +387,7 @@
         deleteCardBtn.classList.add('hidden');
         archiveCardBtn.classList.add('hidden');
         showModal(cardModal);
+        cardModalSnapshot = snapshotCardForm();
         inputTitle.focus();
     }
 
@@ -372,11 +403,18 @@
         deleteCardBtn.classList.remove('hidden');
         archiveCardBtn.classList.remove('hidden');
         showModal(cardModal);
+        cardModalSnapshot = snapshotCardForm();
         inputTitle.focus();
     }
 
+    function closeCardModalSafely() {
+        if (cardFormIsDirty() && !confirm('Ungespeicherte Änderungen verwerfen?')) return;
+        hideModal(cardModal);
+    }
+
     cancelCardBtn.addEventListener('click', () => hideModal(cardModal));
-    cardModal.addEventListener('click', (e) => { if (e.target === cardModal) hideModal(cardModal); });
+    // Bugfix: Klick außerhalb des Popups fragt jetzt nach, statt Eingaben kommentarlos zu verwerfen.
+    cardModal.addEventListener('click', (e) => { if (e.target === cardModal) closeCardModalSafely(); });
 
     cardForm.addEventListener('submit', async (e) => {
         e.preventDefault();
@@ -432,6 +470,20 @@
     }
 
     // --- Column modal ---
+    function snapshotColumnForm() {
+        return {
+            label: columnLabelInput.value,
+            color: columnColorSelect.value,
+            wip: columnWipInput.value,
+        };
+    }
+
+    function columnFormIsDirty() {
+        if (!columnModalSnapshot) return false;
+        const current = snapshotColumnForm();
+        return Object.keys(current).some((k) => current[k] !== columnModalSnapshot[k]);
+    }
+
     function openCreateColumnModal() {
         columnModalTitle.textContent = 'Neue Spalte';
         columnKeyInput.value = '';
@@ -441,6 +493,7 @@
         columnMoveWrapper.classList.add('hidden');
         deleteColumnBtn.classList.add('hidden');
         showModal(columnModal);
+        columnModalSnapshot = snapshotColumnForm();
         columnLabelInput.focus();
     }
 
@@ -453,11 +506,18 @@
         columnMoveWrapper.classList.add('hidden');
         deleteColumnBtn.classList.toggle('hidden', columnsState.length <= 1);
         showModal(columnModal);
+        columnModalSnapshot = snapshotColumnForm();
         columnLabelInput.focus();
     }
 
+    function closeColumnModalSafely() {
+        if (columnFormIsDirty() && !confirm('Ungespeicherte Änderungen verwerfen?')) return;
+        hideModal(columnModal);
+    }
+
     cancelColumnBtn.addEventListener('click', () => hideModal(columnModal));
-    columnModal.addEventListener('click', (e) => { if (e.target === columnModal) hideModal(columnModal); });
+    // Bugfix: Klick außerhalb des Popups fragt jetzt nach, statt Eingaben kommentarlos zu verwerfen.
+    columnModal.addEventListener('click', (e) => { if (e.target === columnModal) closeColumnModalSafely(); });
 
     columnForm.addEventListener('submit', async (e) => {
         e.preventDefault();

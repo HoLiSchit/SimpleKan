@@ -44,11 +44,6 @@ function table_has_column(PDO $pdo, string $table, string $column): bool
     return false;
 }
 
-/**
- * Legt alle Tabellen an (falls nicht vorhanden) und migriert bestehende
- * Installationen automatisch auf das aktuelle Schema. Sicher mehrfach
- * aufrufbar (idempotent) – bestehende Daten bleiben erhalten.
- */
 function ensure_schema(): void
 {
     $pdo = db();
@@ -91,7 +86,6 @@ function ensure_schema(): void
         );
     ');
 
-    // Migrationen für bereits bestehende Installationen ohne die neuen Spalten
     if (!table_has_column($pdo, 'board_columns', 'wip_limit')) {
         $pdo->exec('ALTER TABLE board_columns ADD COLUMN wip_limit INTEGER NOT NULL DEFAULT 0');
     }
