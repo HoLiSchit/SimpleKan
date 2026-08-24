@@ -27,6 +27,8 @@ $jsVersion = @filemtime(__DIR__ . '/assets/js/board.js') ?: time();
     ::-webkit-scrollbar { height: 8px; width: 8px; }
     ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
     .dark ::-webkit-scrollbar-thumb { background: #475569; }
+    .column-collapsed .card-list { max-height: 3rem; overflow-y: auto; }
+    .column-collapsed .add-card-btn { display: none; }
 </style>
 </head>
 <body class="bg-slate-100 dark:bg-slate-900 min-h-screen flex flex-col transition-colors">
@@ -42,22 +44,10 @@ $jsVersion = @filemtime(__DIR__ . '/assets/js/board.js') ?: time();
         </select>
     </div>
     <div class="flex items-center gap-2 flex-wrap">
-        <button id="copy-llm-btn" type="button"
-            class="text-sm bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 px-3 py-1.5 rounded-lg transition">
-            Für LLM kopieren
-        </button>
-        <button id="backup-btn" type="button"
-            class="text-sm bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 px-3 py-1.5 rounded-lg transition">
-            Backup
-        </button>
-        <button id="archive-btn" type="button"
-            class="text-sm bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 px-3 py-1.5 rounded-lg transition">
-            Archiv
-        </button>
-        <button id="theme-toggle" type="button"
-            class="text-sm bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 px-3 py-1.5 rounded-lg transition">
-            <span id="theme-icon">Modus</span>
-        </button>
+        <button id="copy-llm-btn" type="button" class="text-sm bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 px-3 py-1.5 rounded-lg transition">Für LLM kopieren</button>
+        <button id="backup-btn" type="button" class="text-sm bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 px-3 py-1.5 rounded-lg transition">Backup</button>
+        <button id="archive-btn" type="button" class="text-sm bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 px-3 py-1.5 rounded-lg transition">Archiv</button>
+        <button id="theme-toggle" type="button" class="text-sm bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 px-3 py-1.5 rounded-lg transition"><span id="theme-icon">Modus</span></button>
         <span class="text-sm text-slate-500 dark:text-slate-400">Angemeldet als <strong class="text-slate-700 dark:text-slate-200"><?= $username ?></strong></span>
         <a href="logout.php" class="text-sm bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 px-3 py-1.5 rounded-lg transition">Abmelden</a>
     </div>
@@ -67,7 +57,6 @@ $jsVersion = @filemtime(__DIR__ . '/assets/js/board.js') ?: time();
     <div id="board" class="flex gap-4 items-start h-full min-w-max"></div>
 </main>
 
-<!-- Card Modal -->
 <div id="card-modal" class="fixed inset-0 bg-black/40 hidden items-center justify-center p-4 z-50">
     <div class="bg-white dark:bg-slate-800 rounded-xl shadow-xl w-full max-w-md p-6">
         <h3 id="modal-title" class="text-lg font-bold text-slate-800 dark:text-slate-100 mb-4">Neue Karte</h3>
@@ -76,30 +65,25 @@ $jsVersion = @filemtime(__DIR__ . '/assets/js/board.js') ?: time();
             <input type="hidden" id="card-column" value="">
             <div>
                 <label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Titel</label>
-                <input id="card-title" type="text" required maxlength="200"
-                    class="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-slate-400">
+                <input id="card-title" type="text" required maxlength="200" class="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-slate-400">
             </div>
             <div>
                 <label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Beschreibung</label>
-                <textarea id="card-description" rows="3" maxlength="2000"
-                    class="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-slate-400"></textarea>
+                <textarea id="card-description" rows="3" maxlength="2000" class="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-slate-400"></textarea>
             </div>
             <div>
                 <label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Ort / Projekt</label>
-                <input id="card-tag" type="text" maxlength="40" list="tag-suggestions" placeholder="z. B. Swipe-Stack, Homepage…"
-                    class="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-slate-400">
+                <input id="card-tag" type="text" maxlength="40" list="tag-suggestions" placeholder="z. B. Swipe-Stack, Homepage…" class="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-slate-400">
                 <datalist id="tag-suggestions"></datalist>
             </div>
             <div class="grid grid-cols-2 gap-3">
                 <div>
                     <label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Fälligkeitsdatum</label>
-                    <input id="card-due-date" type="date"
-                        class="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-slate-400">
+                    <input id="card-due-date" type="date" class="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-slate-400">
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Priorität</label>
-                    <select id="card-priority"
-                        class="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-slate-400">
+                    <select id="card-priority" class="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-slate-400">
                         <option value="">Keine</option>
                         <option value="niedrig">Niedrig</option>
                         <option value="mittel">Mittel</option>
@@ -121,7 +105,6 @@ $jsVersion = @filemtime(__DIR__ . '/assets/js/board.js') ?: time();
     </div>
 </div>
 
-<!-- Column Modal -->
 <div id="column-modal" class="fixed inset-0 bg-black/40 hidden items-center justify-center p-4 z-50">
     <div class="bg-white dark:bg-slate-800 rounded-xl shadow-xl w-full max-w-sm p-6">
         <h3 id="column-modal-title" class="text-lg font-bold text-slate-800 dark:text-slate-100 mb-4">Neue Spalte</h3>
@@ -129,29 +112,21 @@ $jsVersion = @filemtime(__DIR__ . '/assets/js/board.js') ?: time();
             <input type="hidden" id="column-key" value="">
             <div>
                 <label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Name</label>
-                <input id="column-label" type="text" required maxlength="60"
-                    class="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-slate-400">
+                <input id="column-label" type="text" required maxlength="60" class="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-slate-400">
             </div>
             <div class="grid grid-cols-2 gap-3">
                 <div>
                     <label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Farbe</label>
-                    <select id="column-color"
-                        class="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-slate-400">
-                    </select>
+                    <select id="column-color" class="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-slate-400"></select>
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">WIP-Limit</label>
-                    <input id="column-wip-limit" type="number" min="0" step="1" placeholder="0 = unbegrenzt"
-                        class="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-slate-400">
+                    <input id="column-wip-limit" type="number" min="0" step="1" placeholder="0 = unbegrenzt" class="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-slate-400">
                 </div>
             </div>
             <div id="column-move-wrapper" class="hidden">
-                <label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                    Diese Spalte enthält Karten. Wohin verschieben?
-                </label>
-                <select id="column-move-to"
-                    class="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-slate-400">
-                </select>
+                <label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Diese Spalte enthält Karten. Wohin verschieben?</label>
+                <select id="column-move-to" class="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-slate-400"></select>
             </div>
             <div class="flex justify-between items-center pt-2">
                 <button type="button" id="delete-column-btn" class="hidden text-sm text-rose-600 dark:text-rose-400 hover:text-rose-800 dark:hover:text-rose-300">Spalte löschen</button>
@@ -164,57 +139,37 @@ $jsVersion = @filemtime(__DIR__ . '/assets/js/board.js') ?: time();
     </div>
 </div>
 
-<!-- Archive Modal -->
 <div id="archive-modal" class="fixed inset-0 bg-black/40 hidden items-center justify-center p-4 z-50">
     <div class="bg-white dark:bg-slate-800 rounded-xl shadow-xl w-full max-w-lg p-6 max-h-[80vh] flex flex-col">
         <div class="flex items-center justify-between mb-4">
             <h3 class="text-lg font-bold text-slate-800 dark:text-slate-100">Archiv</h3>
             <button type="button" id="close-archive-btn" class="text-sm text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-100">Schließen</button>
         </div>
-        <div id="archive-list" class="space-y-2 overflow-y-auto flex-1">
-            <p class="text-sm text-slate-400">Lädt…</p>
-        </div>
+        <div id="archive-list" class="space-y-2 overflow-y-auto flex-1"><p class="text-sm text-slate-400">Lädt…</p></div>
     </div>
 </div>
 
-<!-- Backup Modal -->
 <div id="backup-modal" class="fixed inset-0 bg-black/40 hidden items-center justify-center p-4 z-50">
     <div class="bg-white dark:bg-slate-800 rounded-xl shadow-xl w-full max-w-md p-6">
         <div class="flex items-center justify-between mb-4">
             <h3 class="text-lg font-bold text-slate-800 dark:text-slate-100">Backup &amp; Wiederherstellung</h3>
             <button type="button" id="close-backup-btn" class="text-sm text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-100">Schließen</button>
         </div>
-
         <div class="mb-6">
-            <p class="text-sm text-slate-600 dark:text-slate-300 mb-2">
-                Lädt eine JSON-Datei mit allen Spalten und Karten (inkl. Archiv) herunter.
-            </p>
-            <a id="backup-download-link" href="api/backup.php?action=export" download
-                class="inline-block text-sm px-4 py-2 rounded-lg bg-slate-800 dark:bg-slate-600 text-white hover:bg-slate-700 dark:hover:bg-slate-500 transition">
-                Backup herunterladen
-            </a>
+            <p class="text-sm text-slate-600 dark:text-slate-300 mb-2">Lädt eine JSON-Datei mit allen Spalten und Karten (inkl. Archiv) herunter.</p>
+            <a id="backup-download-link" href="api/backup.php?action=export" download class="inline-block text-sm px-4 py-2 rounded-lg bg-slate-800 dark:bg-slate-600 text-white hover:bg-slate-700 dark:hover:bg-slate-500 transition">Backup herunterladen</a>
         </div>
-
         <hr class="border-slate-200 dark:border-slate-700 mb-6">
-
         <div>
-            <p class="text-sm font-medium text-rose-600 dark:text-rose-400 mb-2">
-                Achtung: Wiederherstellen überschreibt das komplette aktuelle Board unwiderruflich!
-            </p>
-            <input id="backup-file-input" type="file" accept="application/json,.json"
-                class="block w-full text-sm text-slate-600 dark:text-slate-300 mb-3 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:bg-slate-100 dark:file:bg-slate-700 file:text-slate-700 dark:file:text-slate-200 hover:file:bg-slate-200 dark:hover:file:bg-slate-600">
-            <button id="restore-backup-btn" type="button" disabled
-                class="text-sm px-4 py-2 rounded-lg bg-rose-600 text-white hover:bg-rose-700 disabled:opacity-50 disabled:cursor-not-allowed transition">
-                Backup wiederherstellen
-            </button>
+            <p class="text-sm font-medium text-rose-600 dark:text-rose-400 mb-2">Achtung: Wiederherstellen überschreibt das komplette aktuelle Board unwiderruflich!</p>
+            <input id="backup-file-input" type="file" accept="application/json,.json" class="block w-full text-sm text-slate-600 dark:text-slate-300 mb-3 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:bg-slate-100 dark:file:bg-slate-700 file:text-slate-700 dark:file:text-slate-200 hover:file:bg-slate-200 dark:hover:file:bg-slate-600">
+            <button id="restore-backup-btn" type="button" disabled class="text-sm px-4 py-2 rounded-lg bg-rose-600 text-white hover:bg-rose-700 disabled:opacity-50 disabled:cursor-not-allowed transition">Backup wiederherstellen</button>
             <p id="backup-status" class="text-sm mt-3"></p>
         </div>
     </div>
 </div>
 
-<script>
-    window.CSRF_TOKEN = <?= json_encode($token) ?>;
-</script>
+<script>window.CSRF_TOKEN = <?= json_encode($token) ?>;</script>
 <script src="assets/js/board.js?v=<?= (int)$jsVersion ?>"></script>
 </body>
 </html>

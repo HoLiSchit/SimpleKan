@@ -5,6 +5,7 @@
     const CARDS_API = 'api/cards.php';
     const COLUMNS_API = 'api/columns.php';
     const BACKUP_API = 'api/backup.php';
+    const COLLAPSE_STORAGE_KEY = 'simplekan_collapsed_columns';
 
     const boardEl = document.getElementById('board');
     const searchInput = document.getElementById('search-input');
@@ -78,6 +79,12 @@
     let cardModalSnapshot = null;
     let columnModalSnapshot = null;
     let pendingImportPayload = null;
+
+    let collapsedColumns = new Set();
+    try { collapsedColumns = new Set(JSON.parse(localStorage.getItem(COLLAPSE_STORAGE_KEY) || '[]')); } catch (err) {}
+    function persistCollapsedColumns() {
+        try { localStorage.setItem(COLLAPSE_STORAGE_KEY, JSON.stringify([...collapsedColumns])); } catch (err) {}
+    }
 
     function updateThemeLabel() {
         if (!themeIcon) return;
@@ -282,6 +289,20 @@
 
     if (copyLlmBtn) copyLlmBtn.addEventListener('click', () => copyTextToClipboard(buildMarkdownExport(), copyLlmBtn));
 
+    function applyCollapsedState(section, collapsed) {
+        section.classList.toggle('column-collapsed', collapsed);
+        const toggleBtn = section.querySelector('.column-toggle-btn');
+        if (toggleBtn) toggleBtn.textContent = collapsed ? '\u25B8' : '\u25BE';
+    }
+
+    function toggleColumnCollapse(key, section) {
+        const collapsed = collapsedColumns.has(key);
+        if (collapsed) collapsedColumns.delete(key);
+        else collapsedColumns.add(key);
+        persistCollapsedColumns();
+        applyCollapsedState(section, !collapsed);
+    }
+
     function renderColumns(columns) {
         columnsState = columns;
         boardEl.innerHTML = '';
@@ -294,6 +315,7 @@
             section.innerHTML = `
                 <div class="column-header flex items-center justify-between px-3 py-2.5 sticky top-0 cursor-grab" draggable="true">
                     <div class="flex items-center gap-2 min-w-0">
+                        <button type="button" class="column-toggle-btn text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 shrink-0 w-4" title="Ein-/Ausklappen">&#9662;</button>
                         <span class="w-2.5 h-2.5 rounded-full shrink-0 ${DOT_CLASS[col.color] || DOT_CLASS.slate}"></span>
                         <h2 class="font-semibold text-slate-700 dark:text-slate-200 text-sm truncate">${escapeHtml(col.label)}</h2>
                         <span class="card-count text-xs text-slate-400 bg-white/70 dark:bg-slate-900/50 rounded-full px-1.5 py-0.5 shrink-0">0</span>
@@ -311,6 +333,10 @@
 
             section.querySelector('.add-card-btn').addEventListener('click', () => openCreateCardModal(col.key));
             section.querySelector('.column-settings-btn').addEventListener('click', () => openEditColumnModal(col));
+            section.querySelector('.column-toggle-btn').addEventListener('click', (e) => {
+                e.stopPropagation();
+                toggleColumnCollapse(col.key, section);
+            });
             const copyBtn = section.querySelector('.column-copy-btn');
             copyBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
@@ -321,6 +347,7 @@
             attachColumnDnD(section, section.querySelector('.column-header'));
 
             boardEl.appendChild(section);
+            applyCollapsedState(section, collapsedColumns.has(col.key));
         });
 
         const addColBtn = document.createElement('button');
@@ -333,7 +360,7 @@
 
     function attachColumnDnD(section, handle) {
         handle.addEventListener('dragstart', (e) => {
-            if (e.target.closest('.column-copy-btn') || e.target.closest('.column-settings-btn')) { e.preventDefault(); return; }
+            if (e.target.closest('.column-copy-btn') || e.target.closest('.column-settings-btn') || e.target.closest('.column-toggle-btn')) { e.preventDefault(); return; }
             draggedType = 'column';
             section.classList.add('opacity-50');
             e.dataTransfer.effectAllowed = 'move';

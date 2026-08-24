@@ -40,9 +40,6 @@ function table_has_column(PDO $pdo, string $table, string $column): bool {
 
 function ensure_schema(): void {
     $pdo = db();
-    // WICHTIG: SQLite-String-Literale MUESSEN einfache Anfuehrungszeichen nutzen ('now'),
-    // doppelte Anfuehrungszeichen werden als Bezeichner interpretiert und sind in
-    // DEFAULT-Klauseln nicht als "konstant" zugelassen (-> PDOException).
     $pdo->exec("CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT NOT NULL UNIQUE,
         password_hash TEXT NOT NULL, failed_attempts INTEGER NOT NULL DEFAULT 0,
