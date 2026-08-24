@@ -81,7 +81,7 @@ if ($method === 'POST' && $action === 'import') {
         $pdo->exec('DELETE FROM board_columns');
         $colStmt = $pdo->prepare('INSERT INTO board_columns (col_key, label, color, position, wip_limit) VALUES (:k, :l, :c, :p, :w)');
         foreach ($cleanColumns as $c) $colStmt->execute([':k' => $c['key'], ':l' => $c['label'], ':c' => $c['color'], ':p' => $c['position'], ':w' => $c['wip_limit']]);
-        $cardStmt = $pdo->prepare('INSERT INTO cards (column_key, title, description, due_date, priority, tag, archived, position, updated_at) VALUES (:col, :t, :d, :due, :prio, :tag, :arch, :pos, datetime("now"))');
+        $cardStmt = $pdo->prepare("INSERT INTO cards (column_key, title, description, due_date, priority, tag, archived, position, updated_at) VALUES (:col, :t, :d, :due, :prio, :tag, :arch, :pos, datetime('now'))");
         foreach ($cleanCards as $c) $cardStmt->execute([':col' => $c['column'], ':t' => $c['title'], ':d' => $c['description'], ':due' => $c['due_date'], ':prio' => $c['priority'], ':tag' => $c['tag'], ':arch' => $c['archived'], ':pos' => $c['position']]);
         $pdo->commit();
     } catch (Throwable $e) { $pdo->rollBack(); respond_json(['error' => 'Wiederherstellung fehlgeschlagen: ' . $e->getMessage()], 500); }

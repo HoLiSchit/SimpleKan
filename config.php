@@ -40,18 +40,21 @@ function table_has_column(PDO $pdo, string $table, string $column): bool {
 
 function ensure_schema(): void {
     $pdo = db();
-    $pdo->exec('CREATE TABLE IF NOT EXISTS users (
+    // WICHTIG: SQLite-String-Literale MUESSEN einfache Anfuehrungszeichen nutzen ('now'),
+    // doppelte Anfuehrungszeichen werden als Bezeichner interpretiert und sind in
+    // DEFAULT-Klauseln nicht als "konstant" zugelassen (-> PDOException).
+    $pdo->exec("CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT NOT NULL UNIQUE,
         password_hash TEXT NOT NULL, failed_attempts INTEGER NOT NULL DEFAULT 0,
-        locked_until INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL DEFAULT (datetime("now")))');
-    $pdo->exec('CREATE TABLE IF NOT EXISTS board_columns (
+        locked_until INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL DEFAULT (datetime('now')))");
+    $pdo->exec("CREATE TABLE IF NOT EXISTS board_columns (
         id INTEGER PRIMARY KEY AUTOINCREMENT, col_key TEXT NOT NULL UNIQUE, label TEXT NOT NULL,
-        color TEXT NOT NULL DEFAULT "slate", position INTEGER NOT NULL DEFAULT 0, wip_limit INTEGER NOT NULL DEFAULT 0)');
-    $pdo->exec('CREATE TABLE IF NOT EXISTS cards (
+        color TEXT NOT NULL DEFAULT 'slate', position INTEGER NOT NULL DEFAULT 0, wip_limit INTEGER NOT NULL DEFAULT 0)");
+    $pdo->exec("CREATE TABLE IF NOT EXISTS cards (
         id INTEGER PRIMARY KEY AUTOINCREMENT, column_key TEXT NOT NULL, title TEXT NOT NULL,
-        description TEXT NOT NULL DEFAULT "", due_date TEXT, priority TEXT, tag TEXT,
+        description TEXT NOT NULL DEFAULT '', due_date TEXT, priority TEXT, tag TEXT,
         archived INTEGER NOT NULL DEFAULT 0, position INTEGER NOT NULL DEFAULT 0,
-        created_at TEXT NOT NULL DEFAULT (datetime("now")), updated_at TEXT NOT NULL DEFAULT (datetime("now")))');
+        created_at TEXT NOT NULL DEFAULT (datetime('now')), updated_at TEXT NOT NULL DEFAULT (datetime('now')))");
 
     if (!table_has_column($pdo, 'board_columns', 'wip_limit')) $pdo->exec('ALTER TABLE board_columns ADD COLUMN wip_limit INTEGER NOT NULL DEFAULT 0');
     if (!table_has_column($pdo, 'cards', 'due_date')) $pdo->exec('ALTER TABLE cards ADD COLUMN due_date TEXT');

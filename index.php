@@ -15,12 +15,9 @@ $jsVersion = @filemtime(__DIR__ . '/assets/js/board.js') ?: time();
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>SimpleKan</title>
 <script src="https://cdn.tailwindcss.com"></script>
+<script>tailwind.config = { darkMode: 'class' };</script>
 <script>
-    tailwind.config = { darkMode: 'class' };
-</script>
-<script>
-    if (localStorage.getItem('theme') === 'dark' ||
-        (!localStorage.getItem('theme') && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+    if (localStorage.getItem('theme') === 'dark' || (!localStorage.getItem('theme') && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
         document.documentElement.classList.add('dark');
     }
 </script>

@@ -79,7 +79,6 @@
     let columnModalSnapshot = null;
     let pendingImportPayload = null;
 
-    // --- Dark Mode Toggle ---
     function updateThemeLabel() {
         if (!themeIcon) return;
         themeIcon.textContent = document.documentElement.classList.contains('dark') ? 'Hell' : 'Dunkel';
@@ -168,7 +167,6 @@
         return `<span class="inline-block text-xs px-1.5 py-0.5 rounded font-medium ${tagChipClass(tag)}">${escapeHtml(tag)}</span>`;
     }
 
-    // --- Card rendering ---
     function createCardEl(card, columnKey, color) {
         const el = document.createElement('div');
         el.className = `card bg-white dark:bg-slate-700 rounded-lg shadow-sm border-l-4 ${BORDER_CLASS[color] || BORDER_CLASS.slate} p-3 cursor-grab hover:shadow-md dark:hover:shadow-slate-900/50 transition text-sm`;
@@ -238,7 +236,6 @@
         });
     }
 
-    // --- Markdown-Export (gesamtes Board oder einzelne Spalte) ---
     function buildColumnMarkdown(col) {
         const cards = cardsState[col.key] || [];
         const lines = [`## ${col.label}${col.wipLimit ? ` (WIP-Limit: ${col.wipLimit})` : ''}`];
@@ -283,11 +280,8 @@
         setTimeout(() => { triggerBtn.textContent = originalText; }, 1500);
     }
 
-    if (copyLlmBtn) {
-        copyLlmBtn.addEventListener('click', () => copyTextToClipboard(buildMarkdownExport(), copyLlmBtn));
-    }
+    if (copyLlmBtn) copyLlmBtn.addEventListener('click', () => copyTextToClipboard(buildMarkdownExport(), copyLlmBtn));
 
-    // --- Column rendering ---
     function renderColumns(columns) {
         columnsState = columns;
         boardEl.innerHTML = '';
@@ -399,7 +393,6 @@
         if (cardsData) renderCards(cardsData.columns);
     }
 
-    // --- Card modal ---
     function snapshotCardForm() {
         return { title: inputTitle.value, description: inputDescription.value, tag: inputTag.value, dueDate: inputDueDate.value, priority: inputPriority.value };
     }
@@ -470,7 +463,6 @@
         catch (err) { alert('Reihenfolge konnte nicht gespeichert werden: ' + err.message); await loadBoard(); }
     }
 
-    // --- Column modal ---
     function snapshotColumnForm() { return { label: columnLabelInput.value, color: columnColorSelect.value, wip: columnWipInput.value }; }
     function columnFormIsDirty() {
         if (!columnModalSnapshot) return false;
@@ -548,7 +540,6 @@
         }
     });
 
-    // --- Archive modal ---
     async function openArchiveModal() {
         showModal(archiveModal);
         archiveList.innerHTML = '<p class="text-sm text-slate-400">Lädt…</p>';
@@ -587,7 +578,6 @@
     if (closeArchiveBtn) closeArchiveBtn.addEventListener('click', () => hideModal(archiveModal));
     archiveModal.addEventListener('click', (e) => { if (e.target === archiveModal) hideModal(archiveModal); });
 
-    // --- Backup / Restore ---
     function resetBackupModal() {
         backupFileInput.value = ''; restoreBackupBtn.disabled = true;
         backupStatus.textContent = ''; backupStatus.className = 'text-sm mt-3';

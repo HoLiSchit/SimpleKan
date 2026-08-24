@@ -52,7 +52,7 @@ switch ("$method:$action") {
         break;
 
     case 'GET:tags':
-        $stmt = $pdo->query('SELECT DISTINCT tag FROM cards WHERE tag IS NOT NULL AND tag != "" AND archived = 0 ORDER BY tag COLLATE NOCASE ASC');
+        $stmt = $pdo->query("SELECT DISTINCT tag FROM cards WHERE tag IS NOT NULL AND tag != '' AND archived = 0 ORDER BY tag COLLATE NOCASE ASC");
         respond(['tags' => array_map(fn($r) => $r['tag'], $stmt->fetchAll(PDO::FETCH_ASSOC))]);
         break;
 
@@ -68,8 +68,8 @@ switch ("$method:$action") {
         if ($title === '' || mb_strlen($title) > 200) respond(['error' => 'Titel ist erforderlich (max. 200 Zeichen).'], 422);
         if (mb_strlen($description) > 2000) respond(['error' => 'Beschreibung zu lang.'], 422);
         if (!valid_due_date($dueDate)) respond(['error' => 'Ungültiges Datum.'], 422);
-        $maxPos = (int)$pdo->query("SELECT COALESCE(MAX(position), -1) FROM cards WHERE column_key = " . $pdo->quote($column))->fetchColumn();
-        $stmt = $pdo->prepare('INSERT INTO cards (column_key, title, description, due_date, priority, tag, position, updated_at) VALUES (:c, :t, :d, :due, :p, :tag, :pos, datetime("now"))');
+        $maxPos = (int)$pdo->query('SELECT COALESCE(MAX(position), -1) FROM cards WHERE column_key = ' . $pdo->quote($column))->fetchColumn();
+        $stmt = $pdo->prepare("INSERT INTO cards (column_key, title, description, due_date, priority, tag, position, updated_at) VALUES (:c, :t, :d, :due, :p, :tag, :pos, datetime('now'))");
         $stmt->execute([':c' => $column, ':t' => $title, ':d' => $description, ':due' => $dueDate ?: null, ':p' => $priority, ':tag' => $tag, ':pos' => $maxPos + 1]);
         respond(['id' => (int)$pdo->lastInsertId()], 201);
         break;
@@ -86,7 +86,7 @@ switch ("$method:$action") {
         if ($title === '' || mb_strlen($title) > 200) respond(['error' => 'Titel ist erforderlich (max. 200 Zeichen).'], 422);
         if (mb_strlen($description) > 2000) respond(['error' => 'Beschreibung zu lang.'], 422);
         if (!valid_due_date($dueDate)) respond(['error' => 'Ungültiges Datum.'], 422);
-        $stmt = $pdo->prepare('UPDATE cards SET title = :t, description = :d, due_date = :due, priority = :p, tag = :tag, updated_at = datetime("now") WHERE id = :id');
+        $stmt = $pdo->prepare("UPDATE cards SET title = :t, description = :d, due_date = :due, priority = :p, tag = :tag, updated_at = datetime('now') WHERE id = :id");
         $stmt->execute([':t' => $title, ':d' => $description, ':due' => $dueDate ?: null, ':p' => $priority, ':tag' => $tag, ':id' => $id]);
         respond(['ok' => true]);
         break;
@@ -94,7 +94,7 @@ switch ("$method:$action") {
     case 'POST:archive':
         $body = json_body(); $id = (int)($body['id'] ?? 0);
         if ($id <= 0) respond(['error' => 'Ungültige ID.'], 422);
-        $pdo->prepare('UPDATE cards SET archived = 1, updated_at = datetime("now") WHERE id = :id')->execute([':id' => $id]);
+        $pdo->prepare("UPDATE cards SET archived = 1, updated_at = datetime('now') WHERE id = :id")->execute([':id' => $id]);
         respond(['ok' => true]);
         break;
 
@@ -106,8 +106,8 @@ switch ("$method:$action") {
         $columnKey = $stmt->fetchColumn();
         if ($columnKey === false) respond(['error' => 'Karte nicht gefunden.'], 404);
         if (!valid_column($pdo, (string)$columnKey)) $columnKey = (string)$pdo->query('SELECT col_key FROM board_columns ORDER BY position ASC LIMIT 1')->fetchColumn();
-        $maxPos = (int)$pdo->query("SELECT COALESCE(MAX(position), -1) FROM cards WHERE column_key = " . $pdo->quote((string)$columnKey) . ' AND archived = 0')->fetchColumn();
-        $pdo->prepare('UPDATE cards SET archived = 0, column_key = :c, position = :p, updated_at = datetime("now") WHERE id = :id')->execute([':c' => $columnKey, ':p' => $maxPos + 1, ':id' => $id]);
+        $maxPos = (int)$pdo->query('SELECT COALESCE(MAX(position), -1) FROM cards WHERE column_key = ' . $pdo->quote((string)$columnKey) . ' AND archived = 0')->fetchColumn();
+        $pdo->prepare("UPDATE cards SET archived = 0, column_key = :c, position = :p, updated_at = datetime('now') WHERE id = :id")->execute([':c' => $columnKey, ':p' => $maxPos + 1, ':id' => $id]);
         respond(['ok' => true]);
         break;
 
@@ -123,7 +123,7 @@ switch ("$method:$action") {
         if (!is_array($cols)) respond(['error' => 'Ungültiges Format.'], 422);
         $pdo->beginTransaction();
         try {
-            $updateStmt = $pdo->prepare('UPDATE cards SET column_key = :c, position = :p, updated_at = datetime("now") WHERE id = :id');
+            $updateStmt = $pdo->prepare("UPDATE cards SET column_key = :c, position = :p, updated_at = datetime('now') WHERE id = :id");
             foreach ($cols as $columnKey => $cardIds) {
                 if (!valid_column($pdo, (string)$columnKey) || !is_array($cardIds)) continue;
                 foreach (array_values($cardIds) as $position => $cardId) {
