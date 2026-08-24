@@ -2,5 +2,6 @@ data/*.sqlite
 data/*.sqlite-journal
 data/*.sqlite-wal
 data/*.sqlite-shm
+*.json
 .DS_Store
 *.log

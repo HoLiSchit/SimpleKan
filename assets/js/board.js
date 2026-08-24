@@ -4,6 +4,7 @@
     const CSRF = window.CSRF_TOKEN;
     const CARDS_API = 'api/cards.php';
     const COLUMNS_API = 'api/columns.php';
+    const BACKUP_API = 'api/backup.php';
 
     const boardEl = document.getElementById('board');
     const searchInput = document.getElementById('search-input');
@@ -41,6 +42,15 @@
     const archiveList = document.getElementById('archive-list');
     const closeArchiveBtn = document.getElementById('close-archive-btn');
 
+    const backupBtn = document.getElementById('backup-btn');
+    const backupModal = document.getElementById('backup-modal');
+    const closeBackupBtn = document.getElementById('close-backup-btn');
+    const backupFileInput = document.getElementById('backup-file-input');
+    const restoreBackupBtn = document.getElementById('restore-backup-btn');
+    const backupStatus = document.getElementById('backup-status');
+
+    const copyLlmBtn = document.getElementById('copy-llm-btn');
+
     const themeToggle = document.getElementById('theme-toggle');
     const themeIcon = document.getElementById('theme-icon');
 
@@ -62,12 +72,12 @@
     ];
 
     let columnsState = [];
+    let cardsState = {};
     let allTags = [];
-    // 'card' | 'column' | null — verhindert, dass sich Karten- und Spalten-Drag gegenseitig stören
     let draggedType = null;
-    // Snapshots zur Erkennung ungespeicherter Änderungen (Klick-außerhalb-Schutz)
     let cardModalSnapshot = null;
     let columnModalSnapshot = null;
+    let pendingImportPayload = null;
 
     // --- Dark Mode Toggle ---
     function updateThemeLabel() {
@@ -92,16 +102,10 @@
 
     function hashString(str) {
         let hash = 0;
-        for (let i = 0; i < str.length; i++) {
-            hash = (hash << 5) - hash + str.charCodeAt(i);
-            hash |= 0;
-        }
+        for (let i = 0; i < str.length; i++) { hash = (hash << 5) - hash + str.charCodeAt(i); hash |= 0; }
         return Math.abs(hash);
     }
-
-    function tagChipClass(tag) {
-        return TAG_CHIP_CLASSES[hashString(tag.toLowerCase()) % TAG_CHIP_CLASSES.length];
-    }
+    function tagChipClass(tag) { return TAG_CHIP_CLASSES[hashString(tag.toLowerCase()) % TAG_CHIP_CLASSES.length]; }
 
     function setCardBorderColor(cardEl, columnKey) {
         const col = columnsState.find((c) => c.key === columnKey);
@@ -121,8 +125,7 @@
         const data = await res.json().catch(() => ({}));
         if (!res.ok) {
             const err = new Error(data.error || 'Fehler bei der Anfrage.');
-            err.payload = data;
-            err.status = res.status;
+            err.payload = data; err.status = res.status;
             throw err;
         }
         return data;
@@ -138,17 +141,13 @@
             allTags = (data && data.tags) || [];
             tagSuggestions.innerHTML = allTags.map((t) => `<option value="${escapeHtml(t)}">`).join('');
             const currentFilter = tagFilterSelect.value;
-            tagFilterSelect.innerHTML = '<option value="">Alle Orte</option>' +
-                allTags.map((t) => `<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`).join('');
+            tagFilterSelect.innerHTML = '<option value="">Alle Orte</option>' + allTags.map((t) => `<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`).join('');
             if (allTags.includes(currentFilter)) tagFilterSelect.value = currentFilter;
         } catch (err) { /* still fine without tags */ }
     }
     if (tagFilterSelect) tagFilterSelect.addEventListener('change', applySearchFilter);
 
-    function formatDate(iso) {
-        const [y, m, d] = iso.split('-');
-        return `${d}.${m}.${y}`;
-    }
+    function formatDate(iso) { const [y, m, d] = iso.split('-'); return `${d}.${m}.${y}`; }
 
     function dueDateBadge(dueDate) {
         if (!dueDate) return '';
@@ -160,12 +159,10 @@
         else if (diffDays <= 2) cls = 'bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300';
         return `<span class="inline-block text-xs px-1.5 py-0.5 rounded ${cls}">${formatDate(dueDate)}</span>`;
     }
-
     function priorityBadge(priority) {
         if (!priority || !PRIORITY_LABELS[priority]) return '';
         return `<span class="inline-block text-xs px-1.5 py-0.5 rounded ${PRIORITY_CLASS[priority]}">${PRIORITY_LABELS[priority]}</span>`;
     }
-
     function tagBadge(tag) {
         if (!tag) return '';
         return `<span class="inline-block text-xs px-1.5 py-0.5 rounded font-medium ${tagChipClass(tag)}">${escapeHtml(tag)}</span>`;
@@ -187,11 +184,7 @@
             ${badges ? `<div class="flex gap-1 flex-wrap mt-2">${badges}</div>` : ''}
         `;
         el.addEventListener('click', () => openEditCardModal(card, columnKey));
-        el.addEventListener('dragstart', (e) => {
-            draggedType = 'card';
-            el.classList.add('dragging');
-            e.dataTransfer.effectAllowed = 'move';
-        });
+        el.addEventListener('dragstart', (e) => { draggedType = 'card'; el.classList.add('dragging'); e.dataTransfer.effectAllowed = 'move'; });
         el.addEventListener('dragend', () => { el.classList.remove('dragging'); draggedType = null; });
         return el;
     }
@@ -212,8 +205,6 @@
             if (draggedType !== 'card') return;
             e.preventDefault();
             list.classList.remove('drag-over');
-            // Bugfix: Randfarbe der verschobenen Karte an die neue Spalte anpassen,
-            // sonst behält die Karte optisch die Farbe der Ursprungsspalte.
             const dragging = document.querySelector('.card.dragging');
             if (dragging) setCardBorderColor(dragging, list.dataset.column);
             updateCounts();
@@ -247,6 +238,55 @@
         });
     }
 
+    // --- Markdown-Export (gesamtes Board oder einzelne Spalte) ---
+    function buildColumnMarkdown(col) {
+        const cards = cardsState[col.key] || [];
+        const lines = [`## ${col.label}${col.wipLimit ? ` (WIP-Limit: ${col.wipLimit})` : ''}`];
+        if (cards.length === 0) {
+            lines.push('_Keine Karten._');
+        } else {
+            cards.forEach((c) => {
+                const meta = [];
+                if (c.tag) meta.push(`Ort: ${c.tag}`);
+                if (c.due_date) meta.push(`Fällig: ${formatDate(c.due_date)}`);
+                if (c.priority && PRIORITY_LABELS[c.priority]) meta.push(`Priorität: ${PRIORITY_LABELS[c.priority]}`);
+                const metaStr = meta.length ? ` _(${meta.join(', ')})_` : '';
+                lines.push(`- **${c.title}**${metaStr}`);
+                if (c.description) lines.push(`  ${c.description.replace(/\n/g, ' ')}`);
+            });
+        }
+        return lines.join('\n');
+    }
+
+    function buildMarkdownExport() {
+        const lines = [`# SimpleKan Board`, `_Exportiert am ${new Date().toLocaleString('de-DE')}_`, ''];
+        columnsState.forEach((col) => { lines.push(buildColumnMarkdown(col)); lines.push(''); });
+        return lines.join('\n');
+    }
+
+    async function copyTextToClipboard(text, triggerBtn) {
+        const originalText = triggerBtn.textContent;
+        try {
+            await navigator.clipboard.writeText(text);
+            triggerBtn.textContent = 'Kopiert!';
+        } catch (err) {
+            const textarea = document.createElement('textarea');
+            textarea.value = text;
+            textarea.style.position = 'fixed';
+            textarea.style.opacity = '0';
+            document.body.appendChild(textarea);
+            textarea.select();
+            try { document.execCommand('copy'); triggerBtn.textContent = 'Kopiert!'; }
+            catch (err2) { triggerBtn.textContent = 'Fehler beim Kopieren'; }
+            document.body.removeChild(textarea);
+        }
+        setTimeout(() => { triggerBtn.textContent = originalText; }, 1500);
+    }
+
+    if (copyLlmBtn) {
+        copyLlmBtn.addEventListener('click', () => copyTextToClipboard(buildMarkdownExport(), copyLlmBtn));
+    }
+
     // --- Column rendering ---
     function renderColumns(columns) {
         columnsState = columns;
@@ -264,7 +304,10 @@
                         <h2 class="font-semibold text-slate-700 dark:text-slate-200 text-sm truncate">${escapeHtml(col.label)}</h2>
                         <span class="card-count text-xs text-slate-400 bg-white/70 dark:bg-slate-900/50 rounded-full px-1.5 py-0.5 shrink-0">0</span>
                     </div>
-                    <button type="button" class="column-settings-btn text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 px-1 shrink-0" title="Spalte bearbeiten">&#8942;</button>
+                    <div class="flex items-center gap-1 shrink-0">
+                        <button type="button" class="column-copy-btn text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 text-xs px-1" title="Nur diese Spalte für LLM kopieren">Kopieren</button>
+                        <button type="button" class="column-settings-btn text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 px-1" title="Spalte bearbeiten">&#8942;</button>
+                    </div>
                 </div>
                 <div class="card-list flex-1 overflow-y-auto px-2 pb-2 space-y-2 min-h-[60px]" data-column="${col.key}"></div>
                 <button class="add-card-btn m-2 text-left text-sm text-slate-500 dark:text-slate-400 hover:bg-slate-300/50 dark:hover:bg-slate-700/50 rounded-lg px-2 py-1.5 transition" data-column="${col.key}">
@@ -274,6 +317,12 @@
 
             section.querySelector('.add-card-btn').addEventListener('click', () => openCreateCardModal(col.key));
             section.querySelector('.column-settings-btn').addEventListener('click', () => openEditColumnModal(col));
+            const copyBtn = section.querySelector('.column-copy-btn');
+            copyBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const freshCol = columnsState.find((c) => c.key === col.key) || col;
+                copyTextToClipboard(buildColumnMarkdown(freshCol), copyBtn);
+            });
             attachCardListDnD(section.querySelector('.card-list'));
             attachColumnDnD(section, section.querySelector('.column-header'));
 
@@ -290,6 +339,7 @@
 
     function attachColumnDnD(section, handle) {
         handle.addEventListener('dragstart', (e) => {
+            if (e.target.closest('.column-copy-btn') || e.target.closest('.column-settings-btn')) { e.preventDefault(); return; }
             draggedType = 'column';
             section.classList.add('opacity-50');
             e.dataTransfer.effectAllowed = 'move';
@@ -315,22 +365,17 @@
 
     async function persistColumnOrder() {
         const order = [...boardEl.querySelectorAll('section[data-column]')].map((s) => s.dataset.column);
-        try {
-            await apiCall(COLUMNS_API, 'reorder', 'POST', { order });
-        } catch (err) {
-            alert('Reihenfolge der Spalten konnte nicht gespeichert werden: ' + err.message);
-            await loadBoard();
-        }
+        try { await apiCall(COLUMNS_API, 'reorder', 'POST', { order }); }
+        catch (err) { alert('Reihenfolge der Spalten konnte nicht gespeichert werden: ' + err.message); await loadBoard(); }
     }
 
     function renderCards(columnsData) {
+        cardsState = columnsData;
         document.querySelectorAll('.card-list').forEach((list) => {
             const key = list.dataset.column;
             const col = columnsState.find((c) => c.key === key);
             list.innerHTML = '';
-            (columnsData[key] || []).forEach((card) => {
-                list.appendChild(createCardEl(card, key, col ? col.color : 'slate'));
-            });
+            (columnsData[key] || []).forEach((card) => list.appendChild(createCardEl(card, key, col ? col.color : 'slate')));
         });
         updateCounts();
         applySearchFilter();
@@ -349,158 +394,101 @@
     if (searchInput) searchInput.addEventListener('input', applySearchFilter);
 
     async function loadBoard() {
-        const [colsData, cardsData] = await Promise.all([
-            apiCall(COLUMNS_API, 'list'),
-            apiCall(CARDS_API, 'list'),
-            refreshTags(),
-        ]);
+        const [colsData, cardsData] = await Promise.all([apiCall(COLUMNS_API, 'list'), apiCall(CARDS_API, 'list'), refreshTags()]);
         if (colsData) renderColumns(colsData.columns);
         if (cardsData) renderCards(cardsData.columns);
     }
 
     // --- Card modal ---
     function snapshotCardForm() {
-        return {
-            title: inputTitle.value,
-            description: inputDescription.value,
-            tag: inputTag.value,
-            dueDate: inputDueDate.value,
-            priority: inputPriority.value,
-        };
+        return { title: inputTitle.value, description: inputDescription.value, tag: inputTag.value, dueDate: inputDueDate.value, priority: inputPriority.value };
     }
-
     function cardFormIsDirty() {
         if (!cardModalSnapshot) return false;
         const current = snapshotCardForm();
         return Object.keys(current).some((k) => current[k] !== cardModalSnapshot[k]);
     }
-
     function openCreateCardModal(columnKey) {
         cardModalTitle.textContent = 'Neue Karte';
-        inputId.value = '';
-        inputColumn.value = columnKey;
-        inputTitle.value = '';
-        inputDescription.value = '';
-        inputTag.value = '';
-        inputDueDate.value = '';
-        inputPriority.value = '';
-        deleteCardBtn.classList.add('hidden');
-        archiveCardBtn.classList.add('hidden');
+        inputId.value = ''; inputColumn.value = columnKey;
+        inputTitle.value = ''; inputDescription.value = ''; inputTag.value = '';
+        inputDueDate.value = ''; inputPriority.value = '';
+        deleteCardBtn.classList.add('hidden'); archiveCardBtn.classList.add('hidden');
         showModal(cardModal);
         cardModalSnapshot = snapshotCardForm();
         inputTitle.focus();
     }
-
     function openEditCardModal(card, columnKey) {
         cardModalTitle.textContent = 'Karte bearbeiten';
-        inputId.value = card.id;
-        inputColumn.value = columnKey;
-        inputTitle.value = card.title;
-        inputDescription.value = card.description || '';
-        inputTag.value = card.tag || '';
-        inputDueDate.value = card.due_date || '';
-        inputPriority.value = card.priority || '';
-        deleteCardBtn.classList.remove('hidden');
-        archiveCardBtn.classList.remove('hidden');
+        inputId.value = card.id; inputColumn.value = columnKey;
+        inputTitle.value = card.title; inputDescription.value = card.description || '';
+        inputTag.value = card.tag || ''; inputDueDate.value = card.due_date || ''; inputPriority.value = card.priority || '';
+        deleteCardBtn.classList.remove('hidden'); archiveCardBtn.classList.remove('hidden');
         showModal(cardModal);
         cardModalSnapshot = snapshotCardForm();
         inputTitle.focus();
     }
-
     function closeCardModalSafely() {
         if (cardFormIsDirty() && !confirm('Ungespeicherte Änderungen verwerfen?')) return;
         hideModal(cardModal);
     }
-
     cancelCardBtn.addEventListener('click', () => hideModal(cardModal));
-    // Bugfix: Klick außerhalb des Popups fragt jetzt nach, statt Eingaben kommentarlos zu verwerfen.
     cardModal.addEventListener('click', (e) => { if (e.target === cardModal) closeCardModalSafely(); });
 
     cardForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         const id = inputId.value;
         const payload = {
-            title: inputTitle.value.trim(),
-            description: inputDescription.value.trim(),
-            column: inputColumn.value,
-            tag: inputTag.value.trim() || null,
-            due_date: inputDueDate.value || null,
-            priority: inputPriority.value || null,
+            title: inputTitle.value.trim(), description: inputDescription.value.trim(), column: inputColumn.value,
+            tag: inputTag.value.trim() || null, due_date: inputDueDate.value || null, priority: inputPriority.value || null,
         };
         try {
             if (id) await apiCall(CARDS_API, 'update', 'POST', { id: Number(id), ...payload });
             else await apiCall(CARDS_API, 'create', 'POST', payload);
             hideModal(cardModal);
             await loadBoard();
-        } catch (err) {
-            alert(err.message);
-        }
+        } catch (err) { alert(err.message); }
     });
 
     deleteCardBtn.addEventListener('click', async () => {
         if (!inputId.value) return;
         if (!confirm('Diese Karte wirklich endgültig löschen?')) return;
-        try {
-            await apiCall(CARDS_API, 'delete', 'POST', { id: Number(inputId.value) });
-            hideModal(cardModal);
-            await loadBoard();
-        } catch (err) { alert(err.message); }
+        try { await apiCall(CARDS_API, 'delete', 'POST', { id: Number(inputId.value) }); hideModal(cardModal); await loadBoard(); }
+        catch (err) { alert(err.message); }
     });
 
     archiveCardBtn.addEventListener('click', async () => {
         if (!inputId.value) return;
-        try {
-            await apiCall(CARDS_API, 'archive', 'POST', { id: Number(inputId.value) });
-            hideModal(cardModal);
-            await loadBoard();
-        } catch (err) { alert(err.message); }
+        try { await apiCall(CARDS_API, 'archive', 'POST', { id: Number(inputId.value) }); hideModal(cardModal); await loadBoard(); }
+        catch (err) { alert(err.message); }
     });
 
     async function persistCardOrder() {
         const columns = {};
-        document.querySelectorAll('.card-list').forEach((list) => {
-            columns[list.dataset.column] = [...list.querySelectorAll('.card')].map((c) => Number(c.dataset.id));
-        });
-        try {
-            await apiCall(CARDS_API, 'reorder', 'POST', { columns });
-        } catch (err) {
-            alert('Reihenfolge konnte nicht gespeichert werden: ' + err.message);
-            await loadBoard();
-        }
+        document.querySelectorAll('.card-list').forEach((list) => { columns[list.dataset.column] = [...list.querySelectorAll('.card')].map((c) => Number(c.dataset.id)); });
+        try { await apiCall(CARDS_API, 'reorder', 'POST', { columns }); }
+        catch (err) { alert('Reihenfolge konnte nicht gespeichert werden: ' + err.message); await loadBoard(); }
     }
 
     // --- Column modal ---
-    function snapshotColumnForm() {
-        return {
-            label: columnLabelInput.value,
-            color: columnColorSelect.value,
-            wip: columnWipInput.value,
-        };
-    }
-
+    function snapshotColumnForm() { return { label: columnLabelInput.value, color: columnColorSelect.value, wip: columnWipInput.value }; }
     function columnFormIsDirty() {
         if (!columnModalSnapshot) return false;
         const current = snapshotColumnForm();
         return Object.keys(current).some((k) => current[k] !== columnModalSnapshot[k]);
     }
-
     function openCreateColumnModal() {
         columnModalTitle.textContent = 'Neue Spalte';
-        columnKeyInput.value = '';
-        columnLabelInput.value = '';
-        columnWipInput.value = '';
+        columnKeyInput.value = ''; columnLabelInput.value = ''; columnWipInput.value = '';
         populateColorSelect(columnColorSelect, 'slate');
-        columnMoveWrapper.classList.add('hidden');
-        deleteColumnBtn.classList.add('hidden');
+        columnMoveWrapper.classList.add('hidden'); deleteColumnBtn.classList.add('hidden');
         showModal(columnModal);
         columnModalSnapshot = snapshotColumnForm();
         columnLabelInput.focus();
     }
-
     function openEditColumnModal(col) {
         columnModalTitle.textContent = 'Spalte bearbeiten';
-        columnKeyInput.value = col.key;
-        columnLabelInput.value = col.label;
+        columnKeyInput.value = col.key; columnLabelInput.value = col.label;
         columnWipInput.value = col.wipLimit > 0 ? col.wipLimit : '';
         populateColorSelect(columnColorSelect, col.color);
         columnMoveWrapper.classList.add('hidden');
@@ -509,14 +497,11 @@
         columnModalSnapshot = snapshotColumnForm();
         columnLabelInput.focus();
     }
-
     function closeColumnModalSafely() {
         if (columnFormIsDirty() && !confirm('Ungespeicherte Änderungen verwerfen?')) return;
         hideModal(columnModal);
     }
-
     cancelColumnBtn.addEventListener('click', () => hideModal(columnModal));
-    // Bugfix: Klick außerhalb des Popups fragt jetzt nach, statt Eingaben kommentarlos zu verwerfen.
     columnModal.addEventListener('click', (e) => { if (e.target === columnModal) closeColumnModalSafely(); });
 
     columnForm.addEventListener('submit', async (e) => {
@@ -542,11 +527,8 @@
         const key = columnKeyInput.value;
         if (!key) return;
         if (!confirm('Diese Spalte wirklich löschen?')) return;
-        try {
-            await apiCall(COLUMNS_API, 'delete', 'POST', { key });
-            hideModal(columnModal);
-            await loadBoard();
-        } catch (err) {
+        try { await apiCall(COLUMNS_API, 'delete', 'POST', { key }); hideModal(columnModal); await loadBoard(); }
+        catch (err) {
             if (err.status === 409 && err.payload && err.payload.error === 'needs_move_to') {
                 const others = columnsState.filter((c) => c.key !== key);
                 if (others.length === 0) { alert('Es gibt keine andere Spalte, in die verschoben werden könnte.'); return; }
@@ -562,9 +544,7 @@
                     } catch (err2) { alert(err2.message); }
                 };
                 deleteColumnBtn.addEventListener('click', onceHandler, { once: true });
-            } else {
-                alert(err.message);
-            }
+            } else { alert(err.message); }
         }
     });
 
@@ -575,10 +555,7 @@
         try {
             const data = await apiCall(CARDS_API, 'list', 'GET', null, 'archived=1');
             const cards = (data && data.cards) || [];
-            if (cards.length === 0) {
-                archiveList.innerHTML = '<p class="text-sm text-slate-400">Das Archiv ist leer.</p>';
-                return;
-            }
+            if (cards.length === 0) { archiveList.innerHTML = '<p class="text-sm text-slate-400">Das Archiv ist leer.</p>'; return; }
             archiveList.innerHTML = cards.map((c) => `
                 <div class="flex items-center justify-between gap-3 bg-slate-100 dark:bg-slate-700 rounded-lg px-3 py-2" data-archive-id="${c.id}">
                     <span class="text-sm text-slate-700 dark:text-slate-200 truncate">${escapeHtml(c.title)}${c.tag ? ` <span class="text-xs text-slate-400">(${escapeHtml(c.tag)})</span>` : ''}</span>
@@ -604,13 +581,65 @@
                     await openArchiveModal();
                 });
             });
-        } catch (err) {
-            archiveList.innerHTML = `<p class="text-sm text-rose-500">${escapeHtml(err.message)}</p>`;
-        }
+        } catch (err) { archiveList.innerHTML = `<p class="text-sm text-rose-500">${escapeHtml(err.message)}</p>`; }
     }
     if (archiveBtn) archiveBtn.addEventListener('click', openArchiveModal);
     if (closeArchiveBtn) closeArchiveBtn.addEventListener('click', () => hideModal(archiveModal));
     archiveModal.addEventListener('click', (e) => { if (e.target === archiveModal) hideModal(archiveModal); });
+
+    // --- Backup / Restore ---
+    function resetBackupModal() {
+        backupFileInput.value = ''; restoreBackupBtn.disabled = true;
+        backupStatus.textContent = ''; backupStatus.className = 'text-sm mt-3';
+        pendingImportPayload = null;
+    }
+    if (backupBtn) backupBtn.addEventListener('click', () => { resetBackupModal(); showModal(backupModal); });
+    if (closeBackupBtn) closeBackupBtn.addEventListener('click', () => hideModal(backupModal));
+    backupModal.addEventListener('click', (e) => { if (e.target === backupModal) hideModal(backupModal); });
+
+    if (backupFileInput) {
+        backupFileInput.addEventListener('change', () => {
+            const file = backupFileInput.files[0];
+            pendingImportPayload = null; restoreBackupBtn.disabled = true; backupStatus.textContent = '';
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = () => {
+                try {
+                    const data = JSON.parse(reader.result);
+                    if (!Array.isArray(data.columns) || !Array.isArray(data.cards)) throw new Error('Datei enthält keine gültige SimpleKan-Backup-Struktur.');
+                    pendingImportPayload = data;
+                    restoreBackupBtn.disabled = false;
+                    backupStatus.textContent = `Bereit: ${data.columns.length} Spalte(n), ${data.cards.length} Karte(n) im Backup gefunden.`;
+                    backupStatus.className = 'text-sm mt-3 text-slate-600 dark:text-slate-300';
+                } catch (err) {
+                    backupStatus.textContent = 'Ungültige Datei: ' + err.message;
+                    backupStatus.className = 'text-sm mt-3 text-rose-500';
+                }
+            };
+            reader.readAsText(file);
+        });
+    }
+
+    if (restoreBackupBtn) {
+        restoreBackupBtn.addEventListener('click', async () => {
+            if (!pendingImportPayload) return;
+            if (!confirm('Das komplette aktuelle Board (alle Spalten und Karten) wird unwiderruflich durch das Backup ersetzt. Fortfahren?')) return;
+            restoreBackupBtn.disabled = true;
+            backupStatus.textContent = 'Wird wiederhergestellt…';
+            backupStatus.className = 'text-sm mt-3 text-slate-600 dark:text-slate-300';
+            try {
+                const result = await apiCall(BACKUP_API, 'import', 'POST', pendingImportPayload);
+                backupStatus.textContent = `Wiederhergestellt: ${result.columns} Spalte(n), ${result.cards} Karte(n).`;
+                backupStatus.className = 'text-sm mt-3 text-emerald-600 dark:text-emerald-400';
+                await loadBoard();
+                setTimeout(() => hideModal(backupModal), 1200);
+            } catch (err) {
+                backupStatus.textContent = 'Fehler: ' + err.message;
+                backupStatus.className = 'text-sm mt-3 text-rose-500';
+                restoreBackupBtn.disabled = false;
+            }
+        });
+    }
 
     function showModal(modal) { modal.classList.remove('hidden'); modal.classList.add('flex'); }
     function hideModal(modal) { modal.classList.add('hidden'); modal.classList.remove('flex'); }

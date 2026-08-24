@@ -4,8 +4,6 @@
 </FilesMatch>
 
 <Files "install.php">
-    # Nach der Einrichtung: Kommentar entfernen, um install.php zusätzlich
-    # per Webserver zu sperren (siehe README).
     # Require all denied
 </Files>
 

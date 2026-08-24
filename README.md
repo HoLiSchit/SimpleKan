@@ -1,99 +1,36 @@
 # SimpleKan
 
-Ein schlankes, selbst-gehostetes Kanban-Board für **einen Account und
-ein Board** — kein Multi-Tenancy, keine Teams, kein Build-Prozess.
-PHP + SQLite im Backend, Tailwind (CDN) im Frontend. Ordner auf den
-Server laden, einrichten, loslegen.
+Ein schlankes, selbst-gehostetes Kanban-Board für einen Account und ein
+Board. PHP + SQLite im Backend, Tailwind (CDN) im Frontend, kein Build-Prozess.
 
 ## Features
 
-- Login mit einem Admin-Account (Passwort-Hashing, Session-Schutz)
-- Spalten frei verwaltbar: anlegen, umbenennen, Farbe ändern, löschen,
-  per Drag & Drop sortieren
-- Karten mit Titel, Beschreibung, Ort/Projekt-Tag (z. B. "Swipe-Stack",
-  "Homepage"), Fälligkeitsdatum und Priorität, inkl. farbiger Badges
-- Filter nach Ort/Projekt über ein Dropdown im Header, kombinierbar mit
-  der Live-Suche
-- Drag & Drop für Karten (zwischen Spalten) und für Spalten (Reihenfolge)
-- WIP-Limit pro Spalte, Anzeige wird rot, wenn überschritten
-- Archiv statt sofortigem Löschen: Karten archivieren, später
-  wiederherstellen oder endgültig entfernen
-- Dark Mode (Umschalter, merkt sich die Wahl, respektiert System-Einstellung)
-
-## Bekannte Einschränkung
-
-Drag & Drop nutzt die native HTML5-Drag&Drop-API. Diese funktioniert
-zuverlässig auf Desktop-Browsern, hat aber keine native
-Touch-Unterstützung — auf Smartphones/Tablets lassen sich Karten
-aktuell nicht per Wischen verschieben (Klicken/Bearbeiten funktioniert
-aber problemlos).
-
-## Voraussetzungen
-
-- PHP 8.1 oder neuer
-- PHP-Extensions `pdo_sqlite` und `session`
-- Schreibrechte für den Ordner `data/`
+- Login mit einem Admin-Account
+- Spalten frei verwaltbar (anlegen, umbenennen, Farbe, Reihenfolge, WIP-Limit)
+- Karten mit Titel, Beschreibung, Ort/Projekt-Tag, Fälligkeitsdatum, Priorität
+- Filter nach Ort + Live-Suche
+- Drag & Drop für Karten und Spalten
+- Archiv statt sofortigem Löschen
+- Backup & Wiederherstellung als JSON
+- "Für LLM kopieren" – für das ganze Board oder pro Spalte einzeln
+- Dark Mode
 
 ## Installation
 
-1. Kompletten Ordner auf den Server laden.
-2. **Dateiberechtigungen setzen:**
-   ```bash
-   cd simplekan
-   chmod 755 .
-   chmod 775 data
-   chown -R www-data:www-data data      # Nutzer/Gruppe an dein Setup anpassen
-   ```
-3. `install.php` im Browser aufrufen, Benutzername + Passwort festlegen.
-4. **`install.php` löschen** (wichtigster Sicherheitsschritt):
-   ```bash
-   rm install.php
-   ```
-5. **`.htaccess` schärfen (optional, empfohlen):** Raute vor
-   `Require all denied` im `<Files "install.php">`-Block entfernen.
-6. Unter `index.php` einloggen und loslegen.
+1. Ordner auf den Server laden.
+2. `chmod 775 data` (+ passenden Owner setzen, z. B. `www-data`).
+3. `install.php` aufrufen, Account anlegen.
+4. `install.php` löschen.
+5. Optional `.htaccess` schärfen (Kommentar vor `Require all denied` im `install.php`-Block entfernen).
+6. Unter `index.php` einloggen.
 
-### Update einer bestehenden Installation
-
-Alle Dateien überschreiben *außer* `data/kanban.sqlite`. Das
-Datenbankschema migriert sich beim nächsten Laden automatisch.
+Update: alle Dateien außer `data/kanban.sqlite` überschreiben, Schema migriert automatisch.
 
 ## Sicherheits-Features
 
-- Passwort-Hashing mit `password_hash()` (bcrypt)
-- PDO mit Prepared Statements überall
-- CSRF-Token-Prüfung bei jeder verändernden Anfrage
-- `HttpOnly` + `SameSite=Strict` Session-Cookies, Session-Regeneration nach Login
-- Brute-Force-Schutz (Sperre nach 5 Fehlversuchen)
-- `htmlspecialchars()` auf allen Ausgaben
-- `.htaccess` blockiert Zugriff auf `.sqlite`-Dateien
-- Serverseitige Validierung aller Eingaben
-
-## Struktur
-
-```
-simplekan/
-├── install.php
-├── login.php
-├── logout.php
-├── index.php
-├── config.php
-├── api/
-│   ├── cards.php
-│   └── columns.php
-├── assets/js/board.js
-├── data/kanban.sqlite
-├── .htaccess
-├── .gitignore
-└── LICENSE
-```
-
-## Hinweis zu Nginx
-
-```nginx
-location ~* \.(sqlite|sqlite3|db)$ { deny all; }
-location = /install.php { deny all; }
-```
+- Passwort-Hashing (bcrypt), PDO Prepared Statements, CSRF-Schutz,
+  HttpOnly/SameSite-Cookies, Brute-Force-Sperre, `.htaccess`-Schutz für
+  `.sqlite`-Dateien, serverseitige Validierung überall.
 
 ## Lizenz
 

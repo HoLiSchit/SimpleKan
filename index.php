@@ -44,7 +44,15 @@ $jsVersion = @filemtime(__DIR__ . '/assets/js/board.js') ?: time();
             <option value="">Alle Orte</option>
         </select>
     </div>
-    <div class="flex items-center gap-3">
+    <div class="flex items-center gap-2 flex-wrap">
+        <button id="copy-llm-btn" type="button"
+            class="text-sm bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 px-3 py-1.5 rounded-lg transition">
+            Für LLM kopieren
+        </button>
+        <button id="backup-btn" type="button"
+            class="text-sm bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 px-3 py-1.5 rounded-lg transition">
+            Backup
+        </button>
         <button id="archive-btn" type="button"
             class="text-sm bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 px-3 py-1.5 rounded-lg transition">
             Archiv
@@ -168,6 +176,41 @@ $jsVersion = @filemtime(__DIR__ . '/assets/js/board.js') ?: time();
         </div>
         <div id="archive-list" class="space-y-2 overflow-y-auto flex-1">
             <p class="text-sm text-slate-400">Lädt…</p>
+        </div>
+    </div>
+</div>
+
+<!-- Backup Modal -->
+<div id="backup-modal" class="fixed inset-0 bg-black/40 hidden items-center justify-center p-4 z-50">
+    <div class="bg-white dark:bg-slate-800 rounded-xl shadow-xl w-full max-w-md p-6">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="text-lg font-bold text-slate-800 dark:text-slate-100">Backup &amp; Wiederherstellung</h3>
+            <button type="button" id="close-backup-btn" class="text-sm text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-100">Schließen</button>
+        </div>
+
+        <div class="mb-6">
+            <p class="text-sm text-slate-600 dark:text-slate-300 mb-2">
+                Lädt eine JSON-Datei mit allen Spalten und Karten (inkl. Archiv) herunter.
+            </p>
+            <a id="backup-download-link" href="api/backup.php?action=export" download
+                class="inline-block text-sm px-4 py-2 rounded-lg bg-slate-800 dark:bg-slate-600 text-white hover:bg-slate-700 dark:hover:bg-slate-500 transition">
+                Backup herunterladen
+            </a>
+        </div>
+
+        <hr class="border-slate-200 dark:border-slate-700 mb-6">
+
+        <div>
+            <p class="text-sm font-medium text-rose-600 dark:text-rose-400 mb-2">
+                Achtung: Wiederherstellen überschreibt das komplette aktuelle Board unwiderruflich!
+            </p>
+            <input id="backup-file-input" type="file" accept="application/json,.json"
+                class="block w-full text-sm text-slate-600 dark:text-slate-300 mb-3 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:bg-slate-100 dark:file:bg-slate-700 file:text-slate-700 dark:file:text-slate-200 hover:file:bg-slate-200 dark:hover:file:bg-slate-600">
+            <button id="restore-backup-btn" type="button" disabled
+                class="text-sm px-4 py-2 rounded-lg bg-rose-600 text-white hover:bg-rose-700 disabled:opacity-50 disabled:cursor-not-allowed transition">
+                Backup wiederherstellen
+            </button>
+            <p id="backup-status" class="text-sm mt-3"></p>
         </div>
     </div>
 </div>
