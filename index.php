@@ -22,6 +22,7 @@ $jsVersion = @filemtime(__DIR__ . '/assets/js/board.js') ?: time();
     }
 </script>
 <style>
+    html, body { height: 100%; }
     .dragging { opacity: 0.4; }
     .drag-over { outline: 2px dashed #64748b; outline-offset: -4px; }
     ::-webkit-scrollbar { height: 8px; width: 8px; }
@@ -29,9 +30,11 @@ $jsVersion = @filemtime(__DIR__ . '/assets/js/board.js') ?: time();
     .dark ::-webkit-scrollbar-thumb { background: #475569; }
     .column-collapsed .card-list { max-height: 3rem; overflow-y: auto; }
     .column-collapsed .add-card-btn { display: none; }
+    /* Eingeklappte Spalte soll sich nicht auf die Hoehe der Nachbarspalten strecken */
+    .column-collapsed { align-self: flex-start; }
 </style>
 </head>
-<body class="bg-slate-100 dark:bg-slate-900 min-h-screen flex flex-col transition-colors">
+<body class="h-screen overflow-hidden bg-slate-100 dark:bg-slate-900 flex flex-col transition-colors">
 
 <header class="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 px-6 py-3 flex flex-wrap items-center justify-between gap-3 shrink-0">
     <h1 class="text-lg font-bold text-slate-800 dark:text-slate-100">SimpleKan</h1>
@@ -53,8 +56,8 @@ $jsVersion = @filemtime(__DIR__ . '/assets/js/board.js') ?: time();
     </div>
 </header>
 
-<main class="flex-1 overflow-x-auto p-6">
-    <div id="board" class="flex gap-4 items-start h-full min-w-max"></div>
+<main class="flex-1 min-h-0 overflow-x-auto overflow-y-hidden p-6">
+    <div id="board" class="flex gap-4 items-stretch h-full min-w-max"></div>
 </main>
 
 <div id="card-modal" class="fixed inset-0 bg-black/40 hidden items-center justify-center p-4 z-50">
